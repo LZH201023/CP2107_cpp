@@ -13,12 +13,12 @@ PK Setup(int k, int t)
         exit(-1);
     }
 
-    mcl::G1 g; mcl::Fr alpha, aux;
+    mcl::G1 g; mcl::Fr aux;
     mcl::Fp r; r.setByCSPRNG();
     mapToG1(g, r);
-    alpha.setByCSPRNG();
     aux.setByCSPRNG();
     mcl::G2 h; mcl::hashAndMapToG2(h, aux.getStr());
+    mcl::Fr alpha; alpha.setByCSPRNG();
     if (alpha == 0) alpha = alpha + 1;
     mcl::G1* v1 = new mcl::G1[t + 1];
     mcl::G2* v2 = new mcl::G2[t + 1];
@@ -115,7 +115,7 @@ Witness_B2 CreateWitness_B2(const PK& pk, mcl::Fr** polys, int num, const int* d
     mcl::Fr temp = 1;
     for (int k = 0; k < num; k++)
     {
-        for (int j = 0; j < degs[k] + 1; j++)
+        for (int j = 0; j <= degs[k]; j++)
             p[j] += polys[k][j] * temp;
         temp *= r;
     }

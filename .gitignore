@@ -1,0 +1,15 @@
+# Ignore everything by default
+*
+*/
+# Allow only the specific .cpp and .hpp files
+!KZG.cpp
+!KZG.hpp
+!NTT.cpp
+!NTT.hpp
+!Protocol.cpp
+!test.cpp
+!cq.cpp
+!cq.hpp
+
+# Allow .gitignore itself
+!.gitignore

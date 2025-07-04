@@ -11,12 +11,10 @@ void NTT_time();
 void KZG_test();
 void protocol_test();
 
-int main()
+int man()
 {
     mcl::initPairing(mcl::BN_SNARK1);
-    NTT_test();
-    KZG_test();
-    protocol_test();
+    NTT_time();
 }
 
 static mcl::Fr* naive_poly_mult(mcl::Fr* f, int df, mcl::Fr* g, int dg)
@@ -82,6 +80,7 @@ void NTT_time()
     }
     std::cout << "NTT average: " << total * 1000.0 / 5 / CLOCKS_PER_SEC << "ms\n";
 }
+//avg. 471.6ms
 
 void KZG_test()
 {
