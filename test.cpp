@@ -15,6 +15,7 @@ int man()
 {
     mcl::initPairing(mcl::BN_SNARK1);
     NTT_time();
+    return 0;
 }
 
 static mcl::Fr* naive_poly_mult(mcl::Fr* f, int df, mcl::Fr* g, int dg)

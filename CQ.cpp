@@ -35,6 +35,7 @@ SRS gen(int N, mcl::Fr* t)
 	}
 	srs2[N] = h * a;
 
+	std::cout << (clock() - timer) * 1000.0 / CLOCKS_PER_SEC << "ms\n";
 	mcl::G2 Zx2 = srs2[N] - h;
 
 	mcl::Fr ge = -1;
@@ -70,13 +71,12 @@ SRS gen(int N, mcl::Fr* t)
 
 void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f)
 {
-	clock_t timer = clock();
+	clock_t timer;
 	clock_t P_time = 0, V_time = 0;
 	//precompute table
 	std::unordered_map<mcl::Fr, int> table;
 	for (int i = 0; i < N; i++)
 		table[t[i]] = i;
-	timer = clock() - timer;
 
 	std::cout << "Protocol begins\n\n";
 
@@ -169,6 +169,9 @@ void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f)
 	mcl::pairing(e2, qa, srs.Zx2);
 	mcl::pairing(e3, m - a * beta, srs.srs2[0]);
 	bool check = (e1 == e2 * e3);
+	mcl::pairing(e1, b0, srs.srs2[N - n + 1]);
+	mcl::pairing(e2, p, srs.srs2[0]);
+	check = check && (e1 == e2);
 	V_time += clock() - timer;
 	if (!check)
 	{
@@ -297,22 +300,51 @@ static mcl::Fr evalPoly(const mcl::Fr* poly, int df, const mcl::Fr& i)
 
 int main()
 {
+	int N, n;
+	N = 32; n = 4;
 	mcl::initPairing(mcl::BN_SNARK1);
-	mcl::Fr* t = new mcl::Fr[128];
-	for (int i = 0; i < 128; i++)
+	mcl::Fr* t = new mcl::Fr[N];
+	for (int i = 0; i < N; i++)
 		t[i].setByCSPRNG();
-	mcl::Fr* f = new mcl::Fr[32];
-	for (int i = 0; i < 32; i++)
+	mcl::Fr* f = new mcl::Fr[n];
+	for (int i = 0; i < n; i++)
 		f[i] = t[i];
-	mcl::Fr* fx = iNTT(f, 32);
-	SRS srs = gen(128, t);
+	mcl::Fr* fx = iNTT(f, n);
+	SRS srs = gen(N, t);
 
 	//Commitment to f
 	mcl::G1 cm;
-	mcl::G1::mulVec(cm, srs.srs1, fx, 32);
+	mcl::G1::mulVec(cm, srs.srs1, fx, n);
 
-	IsInTable(cm, t, 128, srs, 32, f);
+	IsInTable(cm, t, N, srs, n, f);
 	delete[] t; delete[] f; delete[] fx;
+
+	/*std::vector<mcl::Fr> arr(100000);
+	std::vector<mcl::Fr> arr1(100000);
+	for (int i = 0; i < 100000; i++)
+	{
+		arr[i] = rand() % 100 + 1;
+		arr1[i].setByCSPRNG();
+	}
+	std::cout << "Begin\n";
+	clock_t timer;
+	timer = clock();
+	for (int i = 0; i < 100000; i++)
+	{
+		arr[i] + arr1[i];
+	}
+	timer = clock() - timer;
+	std::cout << timer * 1000.0 / CLOCKS_PER_SEC << "ms\n";*/
+
+	/*
+	             c++        |    rust
+	(per 100,000 operations)
+	Fr:          4ms        |    19ms
+	G1 * Fr:   13,302ms     |  253,400ms (approx.) 
+	G1:          64ms       |    108ms
+	e(G1, G2): 102,112ms    |       /
+	*/
+
 }
 
 static mcl::G1* fast_KZG(mcl::Fr* T, int N, const mcl::Fr& ge, mcl::G1* srs)
