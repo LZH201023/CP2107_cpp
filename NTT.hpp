@@ -4,6 +4,7 @@
 static mcl::Fr g, inv_g;
 static int order = 2;
 static bool started = false;
+static mcl::Fr* roots;
 
 template<typename S>
 S* NTT(const S* f, int N)
@@ -35,30 +36,48 @@ S* NTT(const S* f, int N)
     for (int i = 0; i < N; i++)
         arr[i] = f[arr1[i]];
     T = 2;
-    S* temp_arr = new S[N];
+    mcl::Fr* rt;
     mcl::Fr TthRoot = -1;
+    if (order <= N)
+    {
+        delete[] roots;
+        rt = new mcl::Fr[logN + 1];
+        rt[0] = -1;
+        for (int i = 1; i < logN + 1; i++)
+        {
+            mcl::Fr::squareRoot(TthRoot, TthRoot);
+            rt[i] = TthRoot;
+        }
+        roots = rt;
+        g = TthRoot;
+        mcl::Fr::inv(inv_g, g);
+        order = N * 2;
+    }
+    else
+    {
+        rt = roots;
+    }
+    int aux1, aux2;
+    mcl::Fr t;
     for (int i = 0; i < logN; i++)
     {
+        TthRoot = rt[i];
         for (int j = 0; j < N; j += T)
         {
-            mcl::Fr t = 1;
+            t = 1;
+            aux1 = j; aux2 = j + H;
             for (int k = 0; k < H; k++)
             {
-                temp_arr[k] = arr[j + k] + arr[j + k + H] * t;
-                temp_arr[k + H] = arr[j + k] - arr[j + k + H] * t;
+                arr[aux1] = arr[aux1] + arr[aux2] * t;
+                arr[aux2] = arr[aux1] - arr[aux2] * t * 2;
                 t *= TthRoot;
+                aux1++; aux2++;
             }
-            for (int k = 0; k < T; k++)
-                arr[j + k] = temp_arr[k];
         }
         T *= 2;
         H *= 2;
-        mcl::Fr::squareRoot(TthRoot, TthRoot);
     }
-    g = TthRoot * TthRoot;
-    order = N;
-    mcl::Fr::inv(inv_g, g);
-    delete[] arr1; delete[] temp_arr;
+    delete[] arr1;
     return arr;
 }
 
@@ -108,26 +127,27 @@ S* iNTT(const S* f, int N, mcl::Fr ge = 0)
     }
     S* arr = new S[N];
     std::copy(f, f + N, arr);
-    S* res = new S[N];
     int logN = log2(N);
     int T = N; int H = N / 2;
     mcl::Fr w = inv_g;
-    mcl::Fr half = 2; half = 1 / half;
+    mcl::Fr half; mcl::Fr::inv(half, 2);
+    int aux1, aux2;
     for (int i = 0; i < logN; i++) {
         for (int j = 0; j < N; j += T)
         {
+            aux1 = j; aux2 = j + H;
             mcl::Fr a = 1;
             for (int k = 0; k < H; k++)
             {
-                res[j + k] = (arr[j + k] + arr[j + k + H]) * half;
-                res[j + k + H] = (arr[j + k] - arr[j + k + H]) * half * a;
+                arr[aux1] = (arr[aux1] + arr[aux2]) * half;
+                arr[aux2] = (arr[aux1] - arr[aux2]) * a;
                 a *= w;
+                aux1++; aux2++;
             }
         }
         w *= w;
         T /= 2;
         H /= 2;
-        std::swap(arr, res);
     }
 
     int* temp = new int[N];
@@ -137,6 +157,7 @@ S* iNTT(const S* f, int N, mcl::Fr ge = 0)
             temp[j + t] = temp[j] + H;
         t *= 2;
     }
+    S* res = new S[N];
     for (int i = 0; i < N; i++)
         res[i] = arr[temp[i]];
     delete[] temp; delete[] arr;

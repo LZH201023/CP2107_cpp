@@ -3,7 +3,6 @@
 #include <ctime>
 #include <CQ.hpp>
 #include <NTT.hpp>
-#include <KZG.hpp>
 
 SRS gen(int N, mcl::Fr* t);
 void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f);
@@ -212,7 +211,7 @@ void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f)
 		fx[i] = rem;
 		rem = temp + rem * gamma;
 	}
-
+	
 	mcl::G1 pi;
 	mcl::G1::mulVec(pi, srs.srs1, fx, n - 1);
 	P_time += clock() - timer;
@@ -221,6 +220,7 @@ void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f)
 	//Prover computes commitment a0
 	timer = clock();
 	mcl::G1 a0 = mcl::getG1basePoint();
+	mcl::G1 aux = srs.srs1[N - 1] * Ni;
 	for (const auto& pair : A)
 		a0 += srs.Lps1[pair.first] * pair.second;
 	P_time += clock() - timer;
@@ -281,7 +281,7 @@ e(G1, G2): 102,112ms    |       /
 int main()
 {
 	int N, n;
-	N = 8192; n = 256;
+	N = 1024; n = 256;
 	mcl::initPairing(mcl::BN_SNARK1);
 	mcl::Fr* t = new mcl::Fr[N];
 	for (int i = 0; i < N; i++)
