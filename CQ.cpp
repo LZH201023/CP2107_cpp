@@ -34,8 +34,6 @@ SRS gen(int N, mcl::Fr* t)
 		a *= x;
 	}
 	srs2[N] = h * a;
-
-	std::cout << (clock() - timer) * 1000.0 / CLOCKS_PER_SEC << "ms\n";
 	mcl::G2 Zx2 = srs2[N] - h;
 
 	mcl::Fr ge = -1;
@@ -162,26 +160,6 @@ void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f)
 	P_time += clock() - timer;
 	std::cout << "Prover's commitment p: " << p.getStr() << "\n";
 
-	//Verfier checks A and B0
-	timer = clock();
-	mcl::Fp12 e1, e2, e3;
-	mcl::pairing(e1, a, srs.Tx2);
-	mcl::pairing(e2, qa, srs.Zx2);
-	mcl::pairing(e3, m - a * beta, srs.srs2[0]);
-	bool check = (e1 == e2 * e3);
-	mcl::pairing(e1, b0, srs.srs2[N - n + 1]);
-	mcl::pairing(e2, p, srs.srs2[0]);
-	check = check && (e1 == e2);
-	V_time += clock() - timer;
-	if (!check)
-	{
-		std::cout << "Verifier rejects\nProtocol ends\n\n";
-		std::cout << "Prover time: " << P_time * 1000.0 / CLOCKS_PER_SEC << "ms\n"
-			<< "Verifier time: " << V_time * 1000.0 / CLOCKS_PER_SEC << "ms\n";
-		delete[] Bx; delete[] fx; delete[] Q_B;
-		return;
-	}
-
 	//Verifer sends challenge gamma
 	timer = clock();
 	mcl::Fr gamma;
@@ -240,22 +218,6 @@ void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f)
 	P_time += clock() - timer;
 	std::cout << "Prover's commitment pi: " << pi.getStr() << "\n";
 
-	//Verifier's batched check
-	timer = clock();
-	mcl::G1 c = b0 + cm * eta + qb * eta * eta;
-	mcl::pairing(e1, c - srs.srs1[0] * v_v + pi * gamma, srs.srs2[0]);
-	mcl::pairing(e2, pi, srs.srs2[1]);
-	check = (e1 == e2);
-	V_time += clock() - timer;
-	if (!check)
-	{
-		std::cout << "Verifier rejects\nProtocol ends\n\n";
-		std::cout << "Prover time: " << P_time * 1000.0 / CLOCKS_PER_SEC << "ms\n"
-			<< "Verifier time: " << V_time * 1000.0 / CLOCKS_PER_SEC << "ms\n";
-		delete[] Bx; delete[] fx; delete[] Q_B;
-		return;
-	}
-
 	//Prover computes commitment a0
 	timer = clock();
 	mcl::G1 a0 = mcl::getG1basePoint();
@@ -264,12 +226,21 @@ void IsInTable(mcl::G1& cm, mcl::Fr* t, int N, SRS& srs, int n, mcl::Fr* f)
 	P_time += clock() - timer;
 	std::cout << "Prover's commitment a0: " << a0.getStr() << "\n";
 
-	//Verifier checks a0
+	//Verifier's pairing checks using randomness alpha
 	timer = clock();
-	mcl::pairing(e1, a - srs.srs1[0] * a_0, srs.srs2[0]);
-	mcl::pairing(e2, a0, srs.srs2[1]);
-	check = (e1 == e2);
+	bool check;
+	mcl::G1 c = b0 + cm * eta + qb * eta * eta;
+	mcl::Fr alp; alp.setByCSPRNG();
+	mcl::Fr alp2 = alp * alp, alp3 = alp2 * alp;
+	mcl::Fp12 e1, e2, e3, e4, e5;
+	mcl::pairing(e1, a, srs.Tx2);
+	mcl::pairing(e2, qa, srs.Zx2);
+	mcl::pairing(e3, b0 * alp, srs.srs2[N - n + 1]);
+	mcl::pairing(e4, (c - srs.srs1[0] * v_v + pi * gamma) * alp2 + (a - srs.srs1[0] * a_0) * alp3 - p * alp - m + a * beta, srs.srs2[0]);
+	mcl::pairing(e5, pi * alp2 + a0 * alp3, srs.srs2[1]);
+	check = (e1 * e3 * e4) == (e2 * e5);
 	V_time += clock() - timer;
+
 	if (!check)
 	{
 		std::cout << "Verifier rejects\nProtocol ends\n\n";
@@ -298,10 +269,19 @@ static mcl::Fr evalPoly(const mcl::Fr* poly, int df, const mcl::Fr& i)
 	return sum;
 }
 
+/*
+			 c++        |    rust
+(per 100,000 operations)
+Fr:          4ms        |    19ms
+G1 * Fr:   13,302ms     |  253,400ms (approx.)
+G1:          64ms       |    108ms
+e(G1, G2): 102,112ms    |       /
+*/
+
 int main()
 {
 	int N, n;
-	N = 32; n = 4;
+	N = 8192; n = 256;
 	mcl::initPairing(mcl::BN_SNARK1);
 	mcl::Fr* t = new mcl::Fr[N];
 	for (int i = 0; i < N; i++)
@@ -318,38 +298,10 @@ int main()
 
 	IsInTable(cm, t, N, srs, n, f);
 	delete[] t; delete[] f; delete[] fx;
-
-	/*std::vector<mcl::Fr> arr(100000);
-	std::vector<mcl::Fr> arr1(100000);
-	for (int i = 0; i < 100000; i++)
-	{
-		arr[i] = rand() % 100 + 1;
-		arr1[i].setByCSPRNG();
-	}
-	std::cout << "Begin\n";
-	clock_t timer;
-	timer = clock();
-	for (int i = 0; i < 100000; i++)
-	{
-		arr[i] + arr1[i];
-	}
-	timer = clock() - timer;
-	std::cout << timer * 1000.0 / CLOCKS_PER_SEC << "ms\n";*/
-
-	/*
-	             c++        |    rust
-	(per 100,000 operations)
-	Fr:          4ms        |    19ms
-	G1 * Fr:   13,302ms     |  253,400ms (approx.) 
-	G1:          64ms       |    108ms
-	e(G1, G2): 102,112ms    |       /
-	*/
-
 }
 
 static mcl::G1* fast_KZG(mcl::Fr* T, int N, const mcl::Fr& ge, mcl::G1* srs)
 {
-
 	int n = 2 * N;
 	mcl::G1* s = new mcl::G1[n];
 	for (int i = 0; i < N; i++)
